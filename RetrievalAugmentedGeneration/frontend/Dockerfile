@@ -26,7 +26,7 @@ RUN apt-get update; \
     pip3 --no-cache-dir install nvidia-riva-client==2.14.0; \
     apt-get clean
 
-USER 1001
+# USER 1001
 COPY frontend /app/frontend
 
 WORKDIR /app
