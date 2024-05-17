@@ -32,6 +32,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       ENABLE_TRACING: false
+    volumes:
+      - ${MODEL_CACHE_DIR:-./hf_models}:/models
     ports:
     - "8081:8081"
     expose:
@@ -63,6 +65,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       ENABLE_TRACING: false
+    volumes:
+      - ${DOCKER_CACHE_DIR:-./tmp}:/tmp
     ports:
     - "8090:8090"
     expose:
