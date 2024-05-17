@@ -15,31 +15,48 @@
 
 import logging
 import os
-from functools import lru_cache
 from typing import Generator, List, Dict, Any
 
+import torch
 from langchain_community.document_loaders import UnstructuredFileLoader
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate
-from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings
 from RetrievalAugmentedGeneration.common.base import BaseExample
 from RetrievalAugmentedGeneration.common.utils import get_config, get_llm, get_embedding_model, create_vectorstore_langchain, get_docs_vectorstore_langchain, del_docs_vectorstore_langchain, get_text_splitter, get_vectorstore
 from RetrievalAugmentedGeneration.common.tracing import langchain_instrumentation_class_wrapper
+from utils import get_ranking_model
 
 logger = logging.getLogger(__name__)
 DOCS_DIR = os.path.abspath("./uploaded_files")
 vector_store_path = "vectorstore.pkl"
 document_embedder = get_embedding_model()
+document_reranker, tokenizer_rerank = get_ranking_model()
 text_splitter = None
 settings = get_config()
+
+RECALL_K = 10
 
 try:
     vectorstore = create_vectorstore_langchain(document_embedder=document_embedder)
 except Exception as e:
     vectorstore = None
     logger.info(f"Unable to connect to vector store during initialization: {e}")
+
+
+def rank_docs(docs, question, max_return=3):
+    if not docs or len(docs) == 0:
+        return []
+    rerank_pairs = [[question, doc.page_content] for doc in docs]
+    inputs = tokenizer_rerank(rerank_pairs, padding=True, truncation=True, 
+                              return_tensors='pt', max_length=1024).to(document_reranker.device)
+
+    with torch.no_grad():
+        outputs = document_reranker(**inputs.to(document_reranker.device))
+    logits = outputs.logits.view(-1, ).float()
+    rank = logits.argsort(descending=True)
+    selected_docs = [docs[i] for i in rank[:max_return]]
+    return selected_docs
+
 
 @langchain_instrumentation_class_wrapper
 class NvidiaAPICatalog(BaseExample):
@@ -118,18 +135,25 @@ class NvidiaAPICatalog(BaseExample):
         try:
             vs = get_vectorstore(vectorstore, document_embedder)
             if vs != None:
-                try:
-                    logger.info(f"Getting retrieved top k values: {settings.retriever.top_k} with confidence threshold: {settings.retriever.score_threshold}")
-                    retriever = vs.as_retriever(search_type="similarity_score_threshold", search_kwargs={"score_threshold": settings.retriever.score_threshold, "k": settings.retriever.top_k})
-                    docs = retriever.get_relevant_documents(query, callbacks=[self.cb_handler])
-                except NotImplementedError:
-                    # Some retriever like milvus don't have similarity score threshold implemented
-                    retriever = vs.as_retriever()
-                    docs = retriever.get_relevant_documents(query, callbacks=[self.cb_handler])
+                # try:
+                #     logger.info(f"Getting retrieved top k values: {settings.retriever.top_k} with confidence threshold: {settings.retriever.score_threshold}")
+                #     retriever = vs.as_retriever(search_type="similarity_score_threshold", search_kwargs={"score_threshold": settings.retriever.score_threshold, "k": RECALL_K})
+                #     docs = retriever.get_relevant_documents(query, callbacks=[self.cb_handler])
+                # except NotImplementedError:
+                #     # Some retriever like milvus don't have similarity score threshold implemented
+                #     retriever = vs.as_retriever()
+                #     docs = retriever.get_relevant_documents(query, callbacks=[self.cb_handler])
+
+                retriever = vs.as_retriever(search_kwargs={"k": RECALL_K})
+                docs = retriever.get_relevant_documents(query, callbacks=[self.cb_handler])
 
                 if not docs:
                     logger.warning("Retrieval failed to get any relevant context")
                     return iter(["No response generated from LLM, make sure your query is relavent to the ingested document."])
+
+                # reranking
+                docs = rank_docs(docs, query)
+                docs = docs[:settings.retriever.top_k]
 
                 context = ""
                 for doc in docs:
@@ -157,13 +181,20 @@ class NvidiaAPICatalog(BaseExample):
         try:
             vs = get_vectorstore(vectorstore, document_embedder)
             if vs != None:
-                try:
-                    retriever = vs.as_retriever(search_type="similarity_score_threshold", search_kwargs={"score_threshold": settings.retriever.score_threshold, "k": settings.retriever.top_k})
-                    docs = retriever.get_relevant_documents(content, callbacks=[self.cb_handler])
-                except NotImplementedError:
-                    # Some retriever like milvus don't have similarity score threshold implemented
-                    retriever = vs.as_retriever()
-                    docs = retriever.get_relevant_documents(content, callbacks=[self.cb_handler])
+                # try:
+                #     retriever = vs.as_retriever(search_type="similarity_score_threshold", search_kwargs={"score_threshold": settings.retriever.score_threshold, "k": settings.retriever.top_k})
+                #     docs = retriever.get_relevant_documents(content, callbacks=[self.cb_handler])
+                # except NotImplementedError:
+                #     # Some retriever like milvus don't have similarity score threshold implemented
+                #     retriever = vs.as_retriever()
+                #     docs = retriever.get_relevant_documents(content, callbacks=[self.cb_handler])
+
+                retriever = vs.as_retriever(search_kwargs={"k": RECALL_K})
+                docs = retriever.get_relevant_documents(content, callbacks=[self.cb_handler])
+
+                # reranking
+                docs = rank_docs(docs, content)
+                docs = docs[:settings.retriever.top_k]
 
                 result = []
                 for doc in docs:
