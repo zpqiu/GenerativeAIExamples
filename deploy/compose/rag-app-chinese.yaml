@@ -21,8 +21,8 @@ services:
       APP_TEXTSPLITTER_CHUNKSIZE: 510
       APP_TEXTSPLITTER_CHUNKOVERLAP: 200
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
-      APP_PROMPTS_CHATTEMPLATE: "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Please ensure that your responses are positive in nature."
-      APP_PROMPTS_RAGTEMPLATE: "You are a helpful AI assistant named Envie. You will reply to questions only based on the context that you are provided. If something is out of context, you will refrain from replying and politely decline to respond to the user."
+      APP_PROMPTS_CHATTEMPLATE: "您是一个有用、尊重和诚实的助手。请始终尽可能有帮助地回答问题，同时确保安全。请确保您的回答本质上是积极的。"
+      APP_PROMPTS_RAGTEMPLATE: "你是一个名叫Envie的有用的AI助手。你只根据所提供的上下文回答问题。如果有些内容超出了上下文，你将避免回答，并礼貌地拒绝回应用户。"
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-api}
