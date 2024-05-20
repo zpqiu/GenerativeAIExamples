@@ -24,7 +24,7 @@ from langchain_core.prompts.chat import ChatPromptTemplate
 from RetrievalAugmentedGeneration.common.base import BaseExample
 from RetrievalAugmentedGeneration.common.utils import get_config, get_llm, get_embedding_model, create_vectorstore_langchain, get_docs_vectorstore_langchain, del_docs_vectorstore_langchain, get_text_splitter, get_vectorstore
 from RetrievalAugmentedGeneration.common.tracing import langchain_instrumentation_class_wrapper
-from utils import get_ranking_model
+from RetrievalAugmentedGeneration.example.utils import get_ranking_model
 
 logger = logging.getLogger(__name__)
 DOCS_DIR = os.path.abspath("./uploaded_files")
