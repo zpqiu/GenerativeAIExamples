@@ -25,15 +25,8 @@ def get_ranking_model():
 
 prompt_template = "请你对从 PDF 中解析的文本进行 Markdown 格式化。下面的文本是使用 PDF 解析工具解析出的文本：\n\n```{pdf_text}```\n\n请将其转换为 Markdown 格式, 格式化的结果用```markdown ```包裹。"
 
-from openai import OpenAI
 
-client = OpenAI(
-  base_url = "https://integrate.api.nvidia.com/v1",
-  api_key = "nvapi-XXXXXXX"
-)
-
-
-def _format_by_llm(chunk_text):
+def _format_by_llm(client, chunk_text):
     prompt = prompt_template.format(pdf_text=chunk_text)
     completion = client.chat.completions.create(
         model="meta/llama3-8b-instruct",
@@ -53,7 +46,8 @@ def _format_by_llm(chunk_text):
     formatted_text = re.search(r"```markdown(.*?)```", formatted_text, re.DOTALL).group(1)
     return formatted_text
 
-def markdown_pdf_document(document):
+
+def markdown_pdf_document(client, document):
     """Convert the PDF document to markdown."""
     # Split the document into chunks by token number = NIM_MAX_LENGTH
     tokenizer = AutoTokenizer.from_pretrained("nvidia/Llama3-ChatQA-1.5-8B")
@@ -64,7 +58,7 @@ def markdown_pdf_document(document):
     for i in range(0,  len(tokens), NIM_MAX_LENGTH):
         chunk = tokenizer.decode(tokens[i:i + NIM_MAX_LENGTH])
         try:
-            formatted_chunk = _format_by_llm(chunk)
+            formatted_chunk = _format_by_llm(client, chunk)
             if formatted_chunk and len(formatted_chunk) > 0:
                 formatted_chunks.append(formatted_chunk)
             else:
@@ -76,20 +70,3 @@ def markdown_pdf_document(document):
     
     document.page_content = " ".join(formatted_chunks)
     return document
-
-
-from langchain_core.documents.base import Document
-raw_txt = open('test.txt', 'r', encoding='utf-8').read()
-len_10 = int(len(raw_txt)/10)
-raw_txt = raw_txt[len_10*2:len_10*3]
-doc = Document(page_content=raw_txt)
-doc2 = markdown_pdf_document(doc)
-
-print(len(raw_txt))
-print(len(doc2.page_content))
-
-with open('test.md', 'w', encoding='utf-8') as f:
-    f.write(doc2.page_content)
-
-with open('test2.txt', 'w', encoding='utf-8') as f:
-    f.write(raw_txt)

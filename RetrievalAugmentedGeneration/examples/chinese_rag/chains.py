@@ -18,13 +18,14 @@ import os
 from typing import Generator, List, Dict, Any
 
 import torch
+from openai import OpenAI
 from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate
 from RetrievalAugmentedGeneration.common.base import BaseExample
 from RetrievalAugmentedGeneration.common.utils import get_config, get_llm, get_embedding_model, create_vectorstore_langchain, get_docs_vectorstore_langchain, del_docs_vectorstore_langchain, get_text_splitter, get_vectorstore
 from RetrievalAugmentedGeneration.common.tracing import langchain_instrumentation_class_wrapper
-from RetrievalAugmentedGeneration.example.utils import get_ranking_model
+from RetrievalAugmentedGeneration.example.utils import get_ranking_model, markdown_pdf_document
 
 logger = logging.getLogger(__name__)
 DOCS_DIR = os.path.abspath("./uploaded_files")
@@ -33,6 +34,11 @@ document_embedder = get_embedding_model()
 document_reranker, tokenizer_rerank = get_ranking_model()
 text_splitter = None
 settings = get_config()
+
+nim_client = OpenAI(
+  base_url = "https://integrate.api.nvidia.com/v1",
+  api_key = os.environ.get("NVIDIA_API_KEY")
+)
 
 RECALL_K = 10
 
@@ -71,6 +77,9 @@ class NvidiaAPICatalog(BaseExample):
             raw_documents = UnstructuredFileLoader(_path).load()
 
             if raw_documents:
+                if filename.endswith(".pdf"):
+                    raw_documents = [markdown_pdf_document(nim_client, doc) for doc in raw_documents]
+
                 global text_splitter
                 if not text_splitter:
                     text_splitter = get_text_splitter()
