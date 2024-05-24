@@ -68,7 +68,7 @@ def rank_docs(docs, question, max_return=3):
 class NvidiaAPICatalog(BaseExample):
     def ingest_docs(self, filepath: str, filename: str):
         """Ingest documents to the VectorDB."""
-        if  not filename.endswith((".txt",".pdf",".md")):
+        if  not filename.endswith((".txt",".pdf",".md",".html")):
             raise ValueError(f"{filename} is not a valid Text, PDF or Markdown file")
         try:
             # Load raw documents from the directory
