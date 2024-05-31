@@ -83,7 +83,7 @@ class NvidiaAPICatalog(BaseExample):
                 global text_splitter
                 if not text_splitter:
                     text_splitter = get_text_splitter(
-                        embedding_name=settings.embeddings.model_name, 
+                        embedding_model_name=settings.embeddings.model_name, 
                         chunk_size=settings.text_splitter.chunk_size - 2, 
                         chunk_overlap=settings.text_splitter.chunk_overlap)
 
