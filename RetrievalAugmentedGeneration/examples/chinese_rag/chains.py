@@ -23,9 +23,9 @@ from langchain_community.document_loaders import UnstructuredFileLoader
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate
 from RetrievalAugmentedGeneration.common.base import BaseExample
-from RetrievalAugmentedGeneration.common.utils import get_config, get_llm, get_embedding_model, create_vectorstore_langchain, get_docs_vectorstore_langchain, del_docs_vectorstore_langchain, get_text_splitter, get_vectorstore
+from RetrievalAugmentedGeneration.common.utils import get_config, get_llm, get_embedding_model, create_vectorstore_langchain, get_docs_vectorstore_langchain, del_docs_vectorstore_langchain, get_vectorstore
 from RetrievalAugmentedGeneration.common.tracing import langchain_instrumentation_class_wrapper
-from RetrievalAugmentedGeneration.example.utils import get_ranking_model, markdown_pdf_document
+from RetrievalAugmentedGeneration.example.utils import get_ranking_model, markdown_pdf_document, get_text_splitter
 
 logger = logging.getLogger(__name__)
 DOCS_DIR = os.path.abspath("./uploaded_files")
@@ -82,7 +82,10 @@ class NvidiaAPICatalog(BaseExample):
 
                 global text_splitter
                 if not text_splitter:
-                    text_splitter = get_text_splitter()
+                    text_splitter = get_text_splitter(
+                        embedding_name=settings.embeddings.model_name, 
+                        chunk_size=settings.text_splitter.chunk_size - 2, 
+                        chunk_overlap=settings.text_splitter.chunk_overlap)
 
                 documents = text_splitter.split_documents(raw_documents)
                 vs = get_vectorstore(vectorstore, document_embedder)

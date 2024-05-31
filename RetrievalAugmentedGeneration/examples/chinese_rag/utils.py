@@ -5,6 +5,7 @@ from functools import lru_cache
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from langchain.text_splitter import CharacterTextSplitter
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,14 @@ def get_ranking_model():
     rerank_model.eval()
     return rerank_model, tokenizer_rerank
 
+
+def get_text_splitter(embedding_model_name="BAAI/bge-large-zh-v1.5", chunk_size=510, chunk_overlap=200):
+    """Get the text splitter function."""
+    tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
+    text_splitter = CharacterTextSplitter.from_huggingface_tokenizer(
+        tokenizer, chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
+    return text_splitter
 
 prompt_template = "请你对从 PDF 中解析的文本进行 Markdown 格式化。下面的文本是使用 PDF 解析工具解析出的文本：\n\n```{pdf_text}```\n\n请将其转换为 Markdown 格式, 格式化的结果用```markdown ```包裹。"
 
