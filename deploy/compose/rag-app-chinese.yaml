@@ -11,7 +11,7 @@ services:
     environment:
       APP_VECTORSTORE_URL: "http://milvus:19530"
       APP_VECTORSTORE_NAME: "milvus"
-      APP_LLM_MODELNAME: yi_34b
+      APP_LLM_MODELNAME: ai-llama3-70b
       APP_LLM_MODELENGINE: nvidia-ai-endpoints
       APP_LLM_SERVERURL: ${APP_LLM_SERVERURL:-""}
       APP_EMBEDDINGS_MODELNAME: ${APP_EMBEDDINGS_MODELNAME:-BAAI/bge-large-zh-v1.5}
@@ -34,6 +34,7 @@ services:
       ENABLE_TRACING: false
     volumes:
       - ${MODEL_CACHE_DIR:-./hf_models}:/models
+      - ${PDF_CACHE_DIR:-./tmp_pdfs}:/pdfs
     ports:
     - "8081:8081"
     expose:
@@ -67,12 +68,31 @@ services:
       ENABLE_TRACING: false
     volumes:
       - ${DOCKER_CACHE_DIR:-./tmp}:/tmp
+      - ${PDF_CACHE_DIR:-./tmp_pdfs}:/app/frontend/static/pdfs
     ports:
     - "8090:8090"
     expose:
     - "8090"
     depends_on:
     - chain-server
+
+  pdf-parser:
+    container_name: pdf-parser
+    image: pdf-parser:latest
+    build:
+      context: ../.././RetrievalAugmentedGeneration/pdf/
+      dockerfile: Dockerfile
+    command: --port 8088 --host 0.0.0.0
+    environment:
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+    volumes:
+      - ${PDF_CACHE_DIR:-./tmp_pdfs}:/pdfs
+    ports:
+    - "8088:8088"
+    expose:
+    - "8088"
+    # depends_on:
+    # - chain-server
 
 networks:
   default:

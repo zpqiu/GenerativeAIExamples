@@ -17,9 +17,12 @@ import logging
 import os
 from typing import Generator, List, Dict, Any
 
+import re
+import shutil
+import requests
 import torch
 from openai import OpenAI
-from langchain_community.document_loaders import UnstructuredFileLoader
+from langchain_community.document_loaders import UnstructuredFileLoader, TextLoader
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompts.chat import ChatPromptTemplate
 from RetrievalAugmentedGeneration.common.base import BaseExample
@@ -28,7 +31,7 @@ from RetrievalAugmentedGeneration.common.tracing import langchain_instrumentatio
 from RetrievalAugmentedGeneration.example.utils import get_ranking_model, markdown_pdf_document, get_text_splitter
 
 logger = logging.getLogger(__name__)
-DOCS_DIR = os.path.abspath("./uploaded_files")
+# DOCS_DIR = os.path.abspath("./uploaded_files")
 vector_store_path = "vectorstore.pkl"
 document_embedder = get_embedding_model()
 document_reranker, tokenizer_rerank = get_ranking_model()
@@ -64,6 +67,30 @@ def rank_docs(docs, question, max_return=3):
     return selected_docs
 
 
+def ingest_pdf(pdf_path):
+    # copy pdf file to /pdfs
+    pdf_filename = os.path.basename(pdf_path)
+    paring_pdf_path = f"/pdfs/{pdf_filename}"
+    output_path = f"/pdfs/{pdf_filename[:-4]}"
+    # os.mkdir(output_path, exist_ok=True)
+    os.makedirs(output_path, mode=0o777, exist_ok=True)
+    shutil.copy(pdf_path, paring_pdf_path)
+    req = requests.post("http://pdf-parser:8088/parse_pdf", 
+                    json={"pdf_path": paring_pdf_path, "output_path": output_path})
+
+    if req.status_code == 200:
+        logger.info(f"PDF parsing successful: {pdf_filename}")
+        md_path = f"{output_path}/doc.md"
+        target_md_path = f"{pdf_path}.md"
+        shutil.copy(md_path, target_md_path)
+        raw_documents = TextLoader(target_md_path).load()
+        return raw_documents
+    else:
+        logger.error(f"Failed to parse PDF: {pdf_filename}")
+        raw_documents = UnstructuredFileLoader(pdf_path).load()
+        return raw_documents
+
+
 @langchain_instrumentation_class_wrapper
 class NvidiaAPICatalog(BaseExample):
     def ingest_docs(self, filepath: str, filename: str):
@@ -73,12 +100,17 @@ class NvidiaAPICatalog(BaseExample):
         try:
             # Load raw documents from the directory
             # Data is copied to `DOCS_DIR` in common.server:upload_document
-            _path = os.path.join(DOCS_DIR, filename)
-            raw_documents = UnstructuredFileLoader(_path).load()
+            _path = filepath
+            if filename.endswith(".md"):
+                raw_documents = TextLoader(_path).load()
+            elif filename.endswith(".pdf"):
+                raw_documents = ingest_pdf(_path)
+            else:
+                raw_documents = UnstructuredFileLoader(_path).load()
 
             if raw_documents:
-                if filename.endswith(".pdf"):
-                    raw_documents = [markdown_pdf_document(nim_client, doc) for doc in raw_documents]
+                # if filename.endswith(".pdf"):
+                #     raw_documents = [markdown_pdf_document(nim_client, doc) for doc in raw_documents]
 
                 global text_splitter
                 if not text_splitter:
