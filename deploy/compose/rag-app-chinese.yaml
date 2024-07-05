@@ -11,7 +11,7 @@ services:
     environment:
       APP_VECTORSTORE_URL: "http://milvus:19530"
       APP_VECTORSTORE_NAME: "milvus"
-      APP_LLM_MODELNAME: ai-llama3-70b
+      APP_LLM_MODELNAME: meta/llama3-70b-instruct
       APP_LLM_MODELENGINE: nvidia-ai-endpoints
       APP_LLM_SERVERURL: ${APP_LLM_SERVERURL:-""}
       APP_EMBEDDINGS_MODELNAME: ${APP_EMBEDDINGS_MODELNAME:-BAAI/bge-large-zh-v1.5}
@@ -22,7 +22,7 @@ services:
       APP_TEXTSPLITTER_CHUNKOVERLAP: 200
       NVIDIA_API_KEY: ${NVIDIA_API_KEY}
       APP_PROMPTS_CHATTEMPLATE: "您是一个有用、尊重和诚实的助手。请始终尽可能有帮助地回答问题，同时确保安全。请确保您的回答本质上是积极的。"
-      APP_PROMPTS_RAGTEMPLATE: "你是一个名叫Envie的有用的AI助手。你只根据所提供的上下文回答问题。如果有些内容超出了上下文，你将避免回答，并礼貌地拒绝回应用户。"
+      APP_PROMPTS_RAGTEMPLATE: "你是一个名叫Envie的有用的AI助手，你只根据所提供的上下文回答问题。\n请注意：\n-如果有些内容超出了上下文，你将避免回答，并礼貌地拒绝回应用户。\n-如果上下文中包含Markdown格式的图片链接，且根据图片周围的文本推测出图片和问题有关，可以在答复中以Markdown格式加入图片链接来丰富答案内容。"
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-api}

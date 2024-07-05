@@ -1,13 +1,14 @@
 import os
 import re
 import json
+import logging
+
+logging.basicConfig(level=os.environ.get('LOGLEVEL', 'INFO').upper())
+logger = logging.getLogger(__name__)
 
 NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY')
 if NVIDIA_API_KEY is None:
     raise ValueError('Please set the environment variable NVIDIA_API_KEY')
-
-# lines = open('moka.jsonl', 'r').readlines()
-# elements = [json.loads(line) for line in lines]
 
 
 def reorder_elements_for_double_columns(elements):
@@ -60,8 +61,8 @@ prompt_template = """
 from openai import OpenAI
 
 client = OpenAI(
-  base_url = "https://integrate.api.nvidia.com/v1",
-  api_key = "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"
+    base_url = "https://integrate.api.nvidia.com/v1",
+    api_key = NVIDIA_API_KEY
 )
 
 def llm_refine(prompt):
@@ -115,15 +116,12 @@ def refine_by_page(elements, is_double_columns=True):
 
     prompt = prompt_template.format(elements=json_blocks.strip())
 
-    return llm_refine(prompt)
+    try:
+        md_text = llm_refine(prompt)
+    except Exception as e:
+        logger.error(f"Failed to format chunk: {e}")
+        md_text = "\n".join([element['text'] for element in refined_elements 
+                             if element['type'] != 'Image' and element['type'] != 'Table'])
+        # logger.info(f"Failed to format chunk: {md_text}")
 
-# from tqdm import tqdm
-
-# for i in tqdm(range(100), desc='Processing'):
-#     # print(i)
-#     elements_page_i = [element for element in elements if element['metadata']['page_number'] == i]
-#     if len(elements_page_i) == 0:
-#         continue
-#     md = refine_by_page(elements_page_i)
-#     with open(f'page_{i}.md', 'w') as f:
-#         f.write(md)
+    return md_text
