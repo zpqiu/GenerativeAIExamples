@@ -26,7 +26,7 @@ import importlib
 from inspect import getmembers, isclass
 import bleach
 
-from fastapi import FastAPI, File, UploadFile, Request
+from fastapi import FastAPI, File, UploadFile, Request, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -211,7 +211,7 @@ def health_check():
     }
 })
 @llamaindex_instrumentation_wrapper
-async def upload_document(request: Request, file: UploadFile = File(...)) -> JSONResponse:
+async def upload_document(request: Request, file: UploadFile, background_tasks: BackgroundTasks) -> JSONResponse:
     """Upload a document to the vector store."""
 
     if not file.filename:
@@ -229,7 +229,8 @@ async def upload_document(request: Request, file: UploadFile = File(...)) -> JSO
         with open(file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        app.example().ingest_docs(file_path, upload_file)
+        # app.example().ingest_docs(file_path, upload_file)
+        background_tasks.add_task(app.example().ingest_docs, file_path, upload_file)
 
         return JSONResponse(
             content={"message": "File uploaded successfully"}, status_code=200
@@ -425,3 +426,29 @@ async def delete_document(request: Request, filename: str) -> JSONResponse:
     except Exception as e:
         logger.error(f"Error from DELETE /documents endpoint. Error details: {e}")
         return JSONResponse(content={"message": f"Error deleting document {filename}"}, status_code=500)
+
+
+@app.get("/processing_documents", response_model=DocumentsResponse, responses={
+    500: {
+        "description": "Internal Server Error",
+        "content": {
+            "application/json": {
+                "example": {"detail": "Internal server error occurred"}
+            }
+        }
+    }
+})
+@llamaindex_instrumentation_wrapper
+async def get_processing_documents(request: Request) -> DocumentsResponse:
+    """List available documents."""
+    try:
+        example = app.example()
+        if hasattr(example, "get_processing_documents") and callable(example.get_processing_documents):
+            documents = example.get_processing_documents()
+            return DocumentsResponse(documents=documents)
+        else:
+            raise NotImplementedError("Example class has not implemented the get_documents method.")
+
+    except Exception as e:
+        logger.error(f"Error from GET /documents endpoint. Error details: {e}")
+        return JSONResponse(content={"message": "Error occurred while fetching documents."}, status_code=500)

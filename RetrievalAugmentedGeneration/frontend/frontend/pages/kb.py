@@ -41,11 +41,23 @@ def build_page(client: chat_client.ChatClient) -> gr.Blocks:
                 "Add File", file_types=["pdf"], file_count="multiple"
             )
         with gr.Row():
-            file_output = gr.File()
+            file_output = gr.File(label="Uploaded Files")
+
+        with gr.Row():
+            gr.Markdown("### Processing Files")
+
+        with gr.Row():
+            processing_df = gr.Dataframe(
+                headers=["File Under Processing"],
+                datatype=["str"],
+                col_count=(1, "fixed"),
+                value=lambda: get_processing_files(client),
+                every=5,
+            )
 
         with gr.Row():
             files_df = gr.Dataframe(
-                headers=["File Uploaded"],
+                headers=["File in Knowledge Base"],
                 datatype=["str"],
                 col_count=(1, "fixed"),
                 value= lambda: get_uploaded_files(client),
@@ -118,3 +130,11 @@ def get_uploaded_files(client: chat_client.ChatClient)-> List[str]:
     if len(resp)>0:
         uploaded_files=[[file] for file in resp]
     return uploaded_files
+
+def get_processing_files(client: chat_client.ChatClient)-> List[str]:
+    """Load previously uploaded files if the file exists"""
+    processing_files = [["No Files processing"]]
+    resp = client.get_processing_documents()
+    if len(resp)>0:
+        processing_files=[[file] for file in resp]
+    return processing_files

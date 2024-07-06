@@ -38,6 +38,9 @@ document_reranker, tokenizer_rerank = get_ranking_model()
 text_splitter = None
 settings = get_config()
 
+# mainly for tracking the status of uploaded but still not completely processed files
+uploaded_files_status = {}
+
 nim_client = OpenAI(
   base_url = "https://integrate.api.nvidia.com/v1",
   api_key = os.environ.get("NVIDIA_API_KEY")
@@ -95,12 +98,15 @@ def ingest_pdf(pdf_path):
 class NvidiaAPICatalog(BaseExample):
     def ingest_docs(self, filepath: str, filename: str):
         """Ingest documents to the VectorDB."""
+        global uploaded_files_status
+        tracking_filename = os.path.splitext(os.path.basename(filepath))[0]
         if  not filename.endswith((".txt",".pdf",".md",".html")):
             raise ValueError(f"{filename} is not a valid Text, PDF or Markdown file")
         try:
             # Load raw documents from the directory
             # Data is copied to `DOCS_DIR` in common.server:upload_document
             _path = filepath
+            uploaded_files_status[tracking_filename] = 0
             if filename.endswith(".md"):
                 raw_documents = TextLoader(_path).load()
             elif filename.endswith(".pdf"):
@@ -122,9 +128,12 @@ class NvidiaAPICatalog(BaseExample):
                 documents = text_splitter.split_documents(raw_documents)
                 vs = get_vectorstore(vectorstore, document_embedder)
                 vs.add_documents(documents)
+                uploaded_files_status[tracking_filename] = 1
             else:
+                uploaded_files_status[tracking_filename] = -1
                 logger.warning("No documents available to process!")
         except Exception as e:
+            uploaded_files_status[tracking_filename] = -1
             logger.error(f"Failed to ingest document due to exception {e}")
             raise ValueError("Failed to upload document. Please upload an unstructured text document.")
 
@@ -272,3 +281,13 @@ class NvidiaAPICatalog(BaseExample):
                 return del_docs_vectorstore_langchain(vs, filenames)
         except Exception as e:
             logger.error(f"Vectorstore not initialized. Error details: {e}")
+
+    def get_processing_documents(self) -> List[str]:
+        """Get the status of uploaded files."""
+        global uploaded_files_status
+        
+        processing_filenames = []
+        for filename, status in uploaded_files_status.items():
+            if status == 0:
+                processing_filenames.append(filename)
+        return processing_filenames

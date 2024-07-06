@@ -196,3 +196,29 @@ class ChatClient:
             _LOGGER.error(f"Failed to get response from /documents endpoint of chain-server. Error details: {e}. Refer to chain-server logs for details.")
             raise ValueError(f"{e}")
         return uploaded_files
+
+    @tracing.instrumentation_wrapper
+    def get_processing_documents(self, carrier) -> typing.List[str]:
+        """Get list of Processing documents."""
+        url = f"{self.server_url}/processing_documents"
+        headers = {
+            **carrier,
+            "accept": "application/json",
+        }
+        processing_files=[]
+        try:
+            resp = requests.get(
+                url, headers=headers, timeout=600
+            )
+            response = json.loads(resp.content)
+            if resp.status_code == 500:
+                raise ValueError(f"{resp.json().get('message', 'Failed to get uploaded documents')}")
+            else:
+                processing_files = response['documents']
+        except ConnectionError as e:
+            # Avoid playground crash when chain server starts after rag-playground
+            _LOGGER.error(f"Failed to connect /processing_documents endpoint of chain-server. Error details: {e}.")
+        except Exception as e:
+            _LOGGER.error(f"Failed to get response from /processing_documents endpoint of chain-server. Error details: {e}. Refer to chain-server logs for details.")
+            raise ValueError(f"{e}")
+        return processing_files
